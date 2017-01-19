@@ -9,28 +9,10 @@ import sys,datetime,json,csv,requests,unicodedata
 import re
 import sys
 import getopt
+import os
 
-
-ASSOCIATION_BODY = '''{{"catalog_domain" : "{1}", "attributes" : {2} }}'''
-ATTRIBUTE_TO_POST = '''{{"id": "{0}", "tags": [{1}], "groupId": "{2}" }}'''
-ATTRIBUTE_TO_POST_FIXED_VALUES = '''{{"id": "{0}", "tags": [{1}], "fixed_values":{2}, "groupId": "{3}" }}'''
-FIXED_VALUES_BODY = '{{ "value_id":"{0}","value_name":"{1}","fixed_categories":{2} }}'
-
-def generateBody(categoryId, catalogDomain, attributes):
-  '''Genera el post para relacionar categoría con  dominio'''
-  return ASSOCIATION_BODY.format(categoryId, catalogDomain, attributes)
-
-def generateAttribute(attributeid, tags, groupId):
-  '''Genera el json para un atributo del array "attributes" en el cuerpo del curl'''
-  return ATTRIBUTE_TO_POST.format(attributeid, tags, groupId)
-
-def generateAttribute_fixed(attributeid, tags, groupId, fixedValues):
-  '''Genera el json para un atributo del array "attributes" en el cuerpo del curl. Incluye el campo "fixed_values"'''
-  return ATTRIBUTE_TO_POST_FIXED_VALUES.format(attributeid, tags, fixedValues, groupId)
-
-def generateFixedValues(valueId, valueName, fixedCategories):  
-  fixedCategories = str([str(n).strip() for n in fixedCategories.replace("[","").replace("]","").split(",")]).replace("'",'"')
-  return FIXED_VALUES_BODY.format(valueId, valueName, fixedCategories)
+ALLOWED_UNITS_BODY = '''{{"allowed_units": {0} }}'''
+UNIT = '{{ "unit":"{0}","default":"{1}" }}'
 
 def log(msg,should_print=False):
   '''Crea un log con le mensaje "msg" en el archivo de logs. Tambien imprime el mensaje si 'should_print' == True'''
@@ -43,19 +25,36 @@ def loadAttributesFromCSV():
   '''Carga los atributos del csv y genera los curl. Tambien los guarda en los archivos'''
   fecha = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
   log(fecha + " - Comenzando carga de atributos desde archivo",True)
-  try:
-    archivo = open(file, 'rb')
-    reader = csv.DictReader(archivo)
-  except:
-    log(fecha + " - Archivo debe ser un .csv valido",True)
-    print "Comenzando carga de atributos desde archivo"
 
+  archivo = open(file, 'rb')
+  reader = csv.DictReader(archivo)
+
+  unitsArray = []
   catalog_domain, attributeid, value, default = [""]*4
+  currentCatalog_domain, currentAttributeid, currentValue, currentDefault = [""]*4
 
   try:
     for row in reader:
       try:
-        print row
+        catalog_domain = row['catalog_domain'].strip()
+        attributeid = row['attributeid'].strip()
+        default = row['default'].strip()
+        value = row['value'].strip()
+        
+        if (catalog_domain != currentCatalog_domain or currentAttributeid != attributeid) and catalog_domain and attributeid:
+          if len(unitsArray) > 0:
+            print "catalog_domain"
+            print "AND ALL THE CHILDREN ARE INSANE"
+            print catalog_domain
+          createUnit(value, default)
+        else:
+          if currentValue != value:
+            createUnit(currentValue, currentDefault)
+            print "COME ON BABY TAKE A CHANCE WITH US"
+        currentCatalog_domain = catalog_domain
+        currentAttributeid = attributeid
+        currentDefault = default
+        currentValue = value
       except:
         error = True
         errorMessage = "exc " + str(sys.exc_info())
@@ -75,7 +74,7 @@ def dbSave(currentCategory, post_to_make):
     siteId = 'MLB'
   # Guardo con los otros POSTs
   category = "SELECT * FROM categories WHERE category_id LIKE '%s'" % currentCategory
-  cursor.execute(category)
+  #cursor.execute(category)
 
   if(cursor.rowcount == 0):
     print "Guardando Categoria: " + currentCategory
@@ -85,7 +84,7 @@ def dbSave(currentCategory, post_to_make):
     print "Actualizando Categoria: " + currentCategory
     log("Actualizando " + post_to_make)
     add_association = "UPDATE categories SET association_body = '%s' WHERE category_id LIKE '%s'" % (post_to_make, currentCategory)
-  cursor.execute(add_association) 
+  #cursor.execute(add_association) 
 
 def createAttribute(tagArray, attributeArray, categoryId, catalog_domain, attributeid, Required, Hidden, Allow_variations, Fixed, Variation_attribute, groupId, fixedValues):
   '''Crea un atributo y lo agrega a "attributeArray".'''
@@ -131,14 +130,19 @@ def main(argv):
      
     for opt, arg in opts:
       if opt in ('-h', '--help'):
-         print 'python unit_restrictions.py -f restricciones.csv -e development|production'
+         print 'python unit_restrictions.py -f archivo_con_restricciones.csv -e development|production'
          sys.exit()
       if opt in ('-e', '--enviroment'):
          enviroment = arg
-      if if opt in ('-f', '--file'):
+      if opt in ('-f', '--file'):
          file = arg
 
-    logFile = open("curlProductIdentifiers-Info.log", 'wb')
+    filename, file_extension = os.path.splitext(file)
+    if file_extension != '.csv':
+      log(fecha + " - ERROR: El archivo debe estar en formato .csv\n", True)
+      return False      
+
+    logFile = open(filename + ".log", 'wb')
     if enviroment == 'production':
       conn = MySQLdb.connect(host="172.16.125.57", port=6612,
                   user="classimig_WPROD",

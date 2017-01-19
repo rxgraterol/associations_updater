@@ -79,14 +79,16 @@ def loadAttributesFromCSV():
             post_to_make = post_to_make.replace("'{", "{")
             post_to_make = post_to_make.replace("}'", "}")
             dbSave(currentCategory, post_to_make)
+          createAttribute(tagArray, attributeArray, categoryId, catalog_domain, attributeid, Required, Hidden, Allow_variations, Fixed, Variation_attribute, groupId, fixedArray)
           attributeArray = [] 
           tagArray = ""
+          fixedArray = []
           currentCategory = categoryId
           currentCatalogDomain = catalog_domain
-          createAttribute(currentTags, attributeArray, currentCategory, currentCatalogDomain, currentAttributeId, currentRequired, currentHidden, currentAllow_variations, currentFixed, currentVariation_attribute, currentgroupId, fixedArray)
         else:          
           if(currentAttributeId != attributeid):
             createAttribute(currentTags, attributeArray, currentCategory, currentCatalogDomain, currentAttributeId, currentRequired, currentHidden, currentAllow_variations, currentFixed, currentVariation_attribute, currentgroupId, fixedArray)
+            fixedArray = []
           else:
             createFixedValue(fixedArray, value_name, value_id, fixed_categories) 
         currentAttributeId = attributeid
@@ -122,6 +124,7 @@ def loadAttributesFromCSV():
     log("ERROR En la carga de atributos y generación de curls\n",True)
 
   attributeArray = []
+  fixedArray = []
   tagArray = "" 
 
 
@@ -136,12 +139,10 @@ def dbSave(currentCategory, post_to_make):
   cursor.execute(category)
 
   if(cursor.rowcount == 0):
-    print "Guardando Categoria: " + currentCategory
-    log("Guardando " + post_to_make)
+    log("Guardando " + post_to_make, True)
     add_association = "INSERT INTO categories (site_id, category_id, association_body) VALUES ('%s', '%s', '%s')" % (siteId, currentCategory, post_to_make)
   else:
-    print "Actualizando Categoria: " + currentCategory
-    log("Actualizando " + post_to_make)
+    log("Actualizando " + post_to_make, True)
     add_association = "UPDATE categories SET association_body = '%s' WHERE category_id LIKE '%s'" % (post_to_make, currentCategory)
   cursor.execute(add_association) 
 
@@ -164,7 +165,7 @@ def createAttribute(tagArray, attributeArray, categoryId, catalog_domain, attrib
     tagArray = tagArray.replace('[ "', '["')
 
     
-    if Fixed == 'Fixed' and fixedValues :
+    if Fixed == 'Fixed' and len(fixedValues) > 0 :
       attribute = generateAttribute_fixed(attributeid, tagArray, groupId, fixedValues)
     else:
       attribute = generateAttribute(attributeid, tagArray, groupId)
@@ -188,7 +189,7 @@ def main(argv):
      
     for opt, arg in opts:
       if opt in ('-h', '--help'):
-         print 'python updateProductIdentifiers.py -e development|production'
+         log('python updateProductIdentifiers.py -e development|production', True)
          sys.exit()
       elif opt in ('-e', '--enviroment'):
          enviroment = arg
@@ -213,14 +214,12 @@ def main(argv):
 
   except:
     errorMessage = "exc " + str(sys.exc_info())
-    log(errorMessage)
-    print errorMessage
+    log(errorMessage, True)
     sys.exit(2)                     
     if conn:
       conn.close()
     if logFile:
       logFile.close()
-    print errorMessage
 
 
 if __name__ == "__main__":
