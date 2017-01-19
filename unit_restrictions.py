@@ -41,88 +41,30 @@ def log(msg,should_print=False):
 
 def loadAttributesFromCSV():
   '''Carga los atributos del csv y genera los curl. Tambien los guarda en los archivos'''
-
   fecha = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
   log(fecha + " - Comenzando carga de atributos desde archivo",True)
-  archivo = open("ProductIdentifiers.csv", 'rb')
-  reader = csv.DictReader(archivo)
+  try:
+    archivo = open(file, 'rb')
+    reader = csv.DictReader(archivo)
+  except:
+    log(fecha + " - Archivo debe ser un .csv valido",True)
+    print "Comenzando carga de atributos desde archivo"
 
-  attributeArray = []
-  fixedArray = []
-  error = False
-  currentCategory, currentCatalogDomain, tagArray, categoryId, currentAttributeId, catalog_domain, attributeid, Required, Hidden, Allow_variations, Fixed, Variation_attribute, groupId, value_name, value_id, fixed_categories=[""]*16
-  currentRequired, currentHidden, currentFixed, currentTags, currentgroupId, fixedValues, currentAllow_variations, currentVariation_attribute = [""]*8
+  catalog_domain, attributeid, value, default = [""]*4
 
   try:
     for row in reader:
       try:
-
-        categoryId = row['categoryId'].strip()
-        catalog_domain = row['catalog_domain'].strip()
-        attributeid = row['attributeid'].strip()
-        Required = row['Required'].strip()
-        Hidden = row['Hidden'].strip()
-        Allow_variations = row['Allow_variations'].strip()
-        Fixed = row['Fixed'].strip()
-        Variation_attribute = row['Variation_attribute'].strip()
-        groupId = row['groupId'].strip()
-        value_name = row['fixedValueName'].strip()
-        value_id = row['fixedValueId'].strip()
-        fixed_categories = row['fixedCategs'].strip()
-
-        # Si me cambia la categoría que tengía o el catalog domain, entonces genero un POST con la información que tenía
-        if currentCategory != categoryId or currentCatalogDomain != catalog_domain: 
-          # cuando termina la combinacion categoría / atributo, guardo en archivo el curl a ejecutar.
-          if len(attributeArray) > 0:
-            # Genero el post para guardar en un archivo
-            post_to_make = generateBody(currentCategory, currentCatalogDomain, attributeArray)
-            post_to_make = post_to_make.replace("'{", "{")
-            post_to_make = post_to_make.replace("}'", "}")
-            dbSave(currentCategory, post_to_make)
-          attributeArray = [] 
-          tagArray = ""
-          currentCategory = categoryId
-          currentCatalogDomain = catalog_domain
-          createAttribute(currentTags, attributeArray, currentCategory, currentCatalogDomain, currentAttributeId, currentRequired, currentHidden, currentAllow_variations, currentFixed, currentVariation_attribute, currentgroupId, fixedArray)
-        else:          
-          if(currentAttributeId != attributeid):
-            createAttribute(currentTags, attributeArray, currentCategory, currentCatalogDomain, currentAttributeId, currentRequired, currentHidden, currentAllow_variations, currentFixed, currentVariation_attribute, currentgroupId, fixedArray)
-          else:
-            createFixedValue(fixedArray, value_name, value_id, fixed_categories) 
-        currentAttributeId = attributeid
-        currentTags = tagArray
-        currentgroupId = groupId 
-        currentVariation_attribute = Variation_attribute
-        currentRequired = Required
-        currentHidden = Hidden
-        currentFixed = Fixed
+        print row
       except:
         error = True
         errorMessage = "exc " + str(sys.exc_info())
         log(errorMessage,True)
-
   except:
     error = True
     errorMessage = "exc " + str(sys.exc_info())
     log(errorMessage,True)
-
-  #Guardo el último curl cuando ya recorrí todas las filas del csv
-  if len(attributeArray) > 0:
-    # Genero el post para guardar en un archivo
-    post_to_make = generateBody(currentCategory, currentCatalogDomain, attributeArray)
-    post_to_make = post_to_make.replace("'{", "{")
-    post_to_make = post_to_make.replace("}'", "}")
-    log("guardando " + post_to_make)
-    dbSave(currentCategory, post_to_make)
   
-  if not error:
-    fecha = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log(fecha + " - Finaliza La subida de bodys de asociacion. Ambiente: " + enviroment + "\n",True)
-  else:
-    log("ERROR En la carga de atributos y generación de curls\n",True)
-
-  attributeArray = []
-  tagArray = "" 
 
 
 def dbSave(currentCategory, post_to_make):
@@ -182,16 +124,19 @@ def main(argv):
   global logFile
   global cursor
   global enviroment
+  global file
 
   try:
-    opts, args = getopt.getopt(argv, "he:d", ["enviroment=","help"])
+    opts, args = getopt.getopt(argv, "hef:d", ["enviroment","help", "file"])
      
     for opt, arg in opts:
       if opt in ('-h', '--help'):
-         print 'python updateProductIdentifiers.py -e development|production'
+         print 'python unit_restrictions.py -f restricciones.csv -e development|production'
          sys.exit()
-      elif opt in ('-e', '--enviroment'):
+      if opt in ('-e', '--enviroment'):
          enviroment = arg
+      if if opt in ('-f', '--file'):
+         file = arg
 
     logFile = open("curlProductIdentifiers-Info.log", 'wb')
     if enviroment == 'production':
