@@ -14,6 +14,12 @@ import os
 ALLOWED_UNITS_BODY = '''{{"allowed_units": {0} }}'''
 UNIT = '{{ "unit":"{0}","default":"{1}" }}'
 
+def generateUnit(value, default):
+  return UNIT.format(value, default)
+
+def generateAllowedUnits(unitsArray):
+  return ALLOWED_UNITS_BODY.format(unitsArray)  
+
 def log(msg,should_print=False):
   '''Crea un log con le mensaje "msg" en el archivo de logs. Tambien imprime el mensaje si 'should_print' == True'''
   if should_print:
@@ -32,7 +38,7 @@ def loadAttributesFromCSV():
   unitsArray = []
   catalog_domain, attributeid, value, default = [""]*4
   currentCatalog_domain, currentAttributeid, currentValue, currentDefault = [""]*4
-
+  allowed_values_body = ''
   try:
     for row in reader:
       try:
@@ -41,16 +47,16 @@ def loadAttributesFromCSV():
         default = row['default'].strip()
         value = row['value'].strip()
         
-        if (catalog_domain != currentCatalog_domain or currentAttributeid != attributeid) and catalog_domain and attributeid:
+        if (catalog_domain != currentCatalog_domain or currentAttributeid != attributeid):
           if len(unitsArray) > 0:
-            print "catalog_domain"
-            print "AND ALL THE CHILDREN ARE INSANE"
-            print catalog_domain
-          createUnit(value, default)
+            allowed_values_body = createAllowedUnits(unitsArray)
+            dbSave(currentCatalog_domain, allowed_values_body, currentAttributeid)
+            unitsArray = []
+          createUnit(value, default, unitsArray)
+          
         else:
           if currentValue != value:
-            createUnit(currentValue, currentDefault)
-            print "COME ON BABY TAKE A CHANCE WITH US"
+            createUnit(currentValue, currentDefault, unitsArray)
         currentCatalog_domain = catalog_domain
         currentAttributeid = attributeid
         currentDefault = default
@@ -63,61 +69,36 @@ def loadAttributesFromCSV():
     error = True
     errorMessage = "exc " + str(sys.exc_info())
     log(errorMessage,True)
-  
 
+  if len(unitsArray) > 0:
+    allowed_values_body = createAllowedUnits(unitsArray)
+    dbSave(currentCatalog_domain, allowed_values_body, currentAttributeid)
+    unitsArray = []
 
-def dbSave(currentCategory, post_to_make):
-  match = re.match(r"([a-z]+)([0-9]+)", currentCategory, re.I)
-  if match:
-    siteId = match.groups()[0]
-  else:
-    siteId = 'MLB'
+def createUnit(value, default, unitsArray):
+  unit = generateUnit(value, default)
+  unitsArray.append(unit)  
+
+def createAllowedUnits(unitsArray):
+  allowed_units = generateAllowedUnits(unitsArray)
+  allowed_units = allowed_units.replace("'{", "{")
+  allowed_units = allowed_units.replace("}'", "}")  
+  return allowed_units
+
+def dbSave(currentCatalogDomain, currentAttributeid, allowed_units):
   # Guardo con los otros POSTs
-  category = "SELECT * FROM categories WHERE category_id LIKE '%s'" % currentCategory
-  #cursor.execute(category)
+  attribute = "SELECT * FROM attributes WHERE attribute_id LIKE '%s'" % currentAttributeid
+  cursor.execute(attribute)
 
   if(cursor.rowcount == 0):
-    print "Guardando Categoria: " + currentCategory
-    log("Guardando " + post_to_make)
-    add_association = "INSERT INTO categories (site_id, category_id, association_body) VALUES ('%s', '%s', '%s')" % (siteId, currentCategory, post_to_make)
+    print "Guardando Atributo: " + currentAttributeid
+    log("Guardando " + allowed_units)
+    add_allowed_units = "INSERT INTO attributes (catalog_domain, attribute_id, allowed_values) VALUES ('%s','%s', '%s')" % (currentCatalogDomain, currentAttributeid, allowed_units)
   else:
-    print "Actualizando Categoria: " + currentCategory
-    log("Actualizando " + post_to_make)
-    add_association = "UPDATE categories SET association_body = '%s' WHERE category_id LIKE '%s'" % (post_to_make, currentCategory)
-  #cursor.execute(add_association) 
-
-def createAttribute(tagArray, attributeArray, categoryId, catalog_domain, attributeid, Required, Hidden, Allow_variations, Fixed, Variation_attribute, groupId, fixedValues):
-  '''Crea un atributo y lo agrega a "attributeArray".'''
-  #Comparo con los posibles TAGS que pueda tener ese atributo para la relación y aumento el array de tags 
-  if(attributeid):
-    if Required == 'Required':
-      tagArray = tagArray + """ "required","""
-    if Hidden == 'Hidden':
-      tagArray = tagArray + """ "hidden","""
-    if Allow_variations == 'Allow_variations':
-      tagArray = tagArray + """ "allow_variations","""
-    if Fixed == 'Fixed':
-      tagArray = tagArray + """ "fixed","""
-    if Variation_attribute == 'Variation_attribute':
-      tagArray = tagArray + """ "variation_attribute","""
-
-    tagArray = tagArray[:-1]
-    tagArray = tagArray.replace('[ "', '["')
-
-    
-    if Fixed == 'Fixed' and fixedValues :
-      attribute = generateAttribute_fixed(attributeid, tagArray, groupId, fixedValues)
-    else:
-      attribute = generateAttribute(attributeid, tagArray, groupId)
-    
-    attribute = attribute.replace("'{", "{")
-    attribute = attribute.replace("}'", "}")
-    log("creando " + attribute)
-    attributeArray.append(attribute)
-
-def createFixedValue(fixedArray, value_name, value_id, fixed_categories):
-  value = generateFixedValues(value_id, value_name, fixed_categories)
-  fixedArray.append(value)
+    print "Actualizando Atributo: " + currentAttributeid
+    log("Actualizando " + allowed_units)
+    add_allowed_units = "UPDATE attributes SET allowed_values = '%s' WHERE attribute_id LIKE '%s'" % (allowed_units, currentAttributeid)
+  cursor.execute(add_allowed_units) 
 
 def main(argv):
   global logFile
