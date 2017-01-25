@@ -13,7 +13,7 @@ import os
 import pprint
 
 ALLOWED_UNITS_BODY = '''{{"allowed_units": {0} }}'''
-UNIT = '{{ "unit":"{0}","default":"{1}" }}'
+UNIT = '{{ "unit":"{0}","default":{1} }}'
 
 def generateUnit(value, default):
   return UNIT.format(value, default)
@@ -37,8 +37,8 @@ def loadAttributesFromCSV():
   reader = csv.DictReader(archivo)
 
   unitsArray = []
-  catalog_domain, attributeid, value, default, rootCategory = [""]*5
-  currentCatalog_domain, currentAttributeid, currentValue, currentDefault, currentRootCategory = [""]*5
+  catalog_domain, attributeid, value, default, rootCategory, siteId = [""]*6
+  currentCatalog_domain, currentAttributeid, currentValue, currentDefault, currentRootCategory, currentSiteId = [""]*6
   allowed_values_body = ''
   try:
     for row in reader:
@@ -46,13 +46,17 @@ def loadAttributesFromCSV():
         catalog_domain = row['catalog_domain'].strip()
         attributeid = row['attributeid'].strip()
         default = row['default'].strip()
+        if(default == 'Y'): 
+          default = 'true'
+        else: 
+          default = 'false'
         value = row['value'].strip()
         rootCategory = row['root_category'].strip()
-        
+        siteId = row['site_id'].strip()
         if (catalog_domain != currentCatalog_domain or currentAttributeid != attributeid or currentRootCategory != rootCategory):
           if len(unitsArray) > 0:
             allowed_values_body = createAllowedUnits(unitsArray)
-            dbSave(currentCatalog_domain, allowed_values_body, currentAttributeid, currentRootCategory)
+            dbSave(currentCatalog_domain, allowed_values_body, currentAttributeid, currentRootCategory, currentSiteId)
             unitsArray = []
           createUnit(value, default, unitsArray)
           
@@ -64,6 +68,7 @@ def loadAttributesFromCSV():
         currentDefault = default
         currentValue = value
         currentRootCategory = rootCategory
+        currentSiteId = siteId
       except:
         error = True
         errorMessage = "exc " + str(sys.exc_info())
@@ -75,7 +80,7 @@ def loadAttributesFromCSV():
 
   if len(unitsArray) > 0:
     allowed_values_body = createAllowedUnits(unitsArray)
-    dbSave(currentCatalog_domain, allowed_values_body, currentAttributeid, currentRootCategory)
+    dbSave(currentCatalog_domain, allowed_values_body, currentAttributeid, currentRootCategory, currentSiteId)
     unitsArray = []
 
 def createUnit(value, default, unitsArray):
@@ -88,7 +93,7 @@ def createAllowedUnits(unitsArray):
   allowed_units = allowed_units.replace("}'", "}")  
   return allowed_units
 
-def dbSave(currentCatalogDomain, allowed_units, currentAttributeid, currentRootCategory):
+def dbSave(currentCatalogDomain, allowed_units, currentAttributeid, currentRootCategory, currentSiteId):
   # Guardo con los otros POSTs
   attribute = "SELECT * FROM attributes WHERE attribute_id LIKE '%s' AND catalog_domain LIKE '%s'" % (currentAttributeid, currentCatalogDomain)
   cursor.execute(attribute)
@@ -96,11 +101,11 @@ def dbSave(currentCatalogDomain, allowed_units, currentAttributeid, currentRootC
   if(cursor.rowcount == 0):
     print "Guardando Atributo: " + currentAttributeid
     log("Guardando " + allowed_units)
-    add_allowed_units = "INSERT INTO attributes (catalog_domain, attribute_id, allowed_values, root_category) VALUES ('%s','%s', '%s', '%s')" % (currentCatalogDomain, currentAttributeid, allowed_units, currentRootCategory)
+    add_allowed_units = "INSERT INTO attributes (catalog_domain, attribute_id, allowed_values, root_category, site_id) VALUES ('%s','%s', '%s', '%s', '%s')" % (currentCatalogDomain, currentAttributeid, allowed_units, currentRootCategory, currentSiteId)
   else:
     print "Actualizando Atributo: " + currentAttributeid
     log("Actualizando " + allowed_units)
-    add_allowed_units = "UPDATE attributes SET allowed_values = '%s', root_category='%s' WHERE attribute_id LIKE '%s' AND catalog_domain LIKE '%s'" % (allowed_units, currentRootCategory, currentAttributeid, currentCatalogDomain)
+    add_allowed_units = "UPDATE attributes SET allowed_values = '%s', root_category='%s', site_id='%s' WHERE attribute_id LIKE '%s' AND catalog_domain LIKE '%s'" % (allowed_units, currentRootCategory, currentSiteId, currentAttributeid, currentCatalogDomain)
   cursor.execute(add_allowed_units) 
 
 def main(argv):
