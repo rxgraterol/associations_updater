@@ -133,10 +133,7 @@ def main(argv):
 
     logFile = open(filename + ".log", 'wb')
     if enviroment == 'production':
-      conn = MySQLdb.connect(host="172.16.125.57", port=6612,
-                  user="classimig_WPROD",
-                  passwd="yUYaq39yWo",
-                  db="classimig")
+      conn = MySQLdb.connect()
       
     else:
       conn = MySQLdb.connect(host="localhost",
