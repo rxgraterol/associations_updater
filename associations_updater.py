@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+# encoding=utf8
 from time import sleep
 from decimal import Decimal
 import MySQLdb
@@ -9,15 +9,17 @@ import sys,datetime,json,csv,requests,unicodedata
 import re
 import sys
 import getopt
+import pprint
 
 
-ASSOCIATION_BODY = '''{{"catalog_domain" : "{1}", "attributes" : {2} }}'''
+ASSOCIATION_BODY = '''{{"catalog_domain" : "{1}", "attributes" : [{2}] }}'''
 ATTRIBUTE_TO_POST = '''{{"id": "{0}", "tags": [{1}], "groupId": "{2}" }}'''
-ATTRIBUTE_TO_POST_FIXED_VALUES = '''{{"id": "{0}", "tags": [{1}], "fixed_values":{2}, "groupId": "{3}" }}'''
+ATTRIBUTE_TO_POST_FIXED_VALUES = '''{{"id": "{0}", "tags": [{1}], "fixed_values":[{2}], "groupId": "{3}" }}'''
 FIXED_VALUES_BODY = '{{ "value_id":"{0}","value_name":"{1}","fixed_categories":{2} }}'
 
 def generateBody(categoryId, catalogDomain, attributes):
   '''Genera el post para relacionar categoría con  dominio'''
+  attributes = ','.join(attributes)
   return ASSOCIATION_BODY.format(categoryId, catalogDomain, attributes)
 
 def generateAttribute(attributeid, tags, groupId):
@@ -26,6 +28,7 @@ def generateAttribute(attributeid, tags, groupId):
 
 def generateAttribute_fixed(attributeid, tags, groupId, fixedValues):
   '''Genera el json para un atributo del array "attributes" en el cuerpo del curl. Incluye el campo "fixed_values"'''
+  fixedValues = ','.join(fixedValues)
   return ATTRIBUTE_TO_POST_FIXED_VALUES.format(attributeid, tags, fixedValues, groupId)
 
 def generateFixedValues(valueId, valueName, fixedCategories):  
@@ -35,7 +38,7 @@ def generateFixedValues(valueId, valueName, fixedCategories):
 def log(msg,should_print=False):
   '''Crea un log con le mensaje "msg" en el archivo de logs. Tambien imprime el mensaje si 'should_print' == True'''
   if should_print:
-    print(msg+"\n")
+    pprint.pprint(msg)
   logFile.write(msg + '\n')
   logFile.flush()
 
@@ -66,7 +69,8 @@ def loadAttributesFromCSV():
         Fixed = row['Fixed'].strip()
         Variation_attribute = row['Variation_attribute'].strip()
         groupId = row['groupId'].strip()
-        value_name = row['fixedValueName'].strip()
+
+        value_name = row['fixedValueName']
         value_id = row['fixedValueId'].strip()
         fixed_categories = row['fixedCategs'].strip()
 
@@ -78,7 +82,7 @@ def loadAttributesFromCSV():
             post_to_make = generateBody(currentCategory, currentCatalogDomain, attributeArray)
             post_to_make = post_to_make.replace("'{", "{")
             post_to_make = post_to_make.replace("}'", "}")
-            dbSave(currentCategory, post_to_make)
+            dbSave(currentCatalogDomain, currentCategory, post_to_make)
           createAttribute(tagArray, attributeArray, categoryId, catalog_domain, attributeid, Required, Hidden, Allow_variations, Fixed, Variation_attribute, groupId, fixedArray)
           attributeArray = [] 
           tagArray = ""
@@ -115,7 +119,9 @@ def loadAttributesFromCSV():
     post_to_make = post_to_make.replace("'{", "{")
     post_to_make = post_to_make.replace("}'", "}")
     log("guardando " + post_to_make)
-    dbSave(currentCategory, post_to_make)
+    print "POST TO MAKE SIZE"
+    print sys.getsizeof(post_to_make)
+    dbSave(currentCatalogDomain, currentCategory, post_to_make)
   
   if not error:
     fecha = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -128,22 +134,22 @@ def loadAttributesFromCSV():
   tagArray = "" 
 
 
-def dbSave(currentCategory, post_to_make):
+def dbSave(currentCatalogDomain, currentCategory, post_to_make):
   match = re.match(r"([a-z]+)([0-9]+)", currentCategory, re.I)
   if match:
     siteId = match.groups()[0]
   else:
     siteId = 'MLB'
   # Guardo con los otros POSTs
-  category = "SELECT * FROM categories WHERE category_id LIKE '%s'" % currentCategory
+  category = "SELECT * FROM domains WHERE category_id LIKE '%s'" % currentCategory
   cursor.execute(category)
 
   if(cursor.rowcount == 0):
     log("Guardando " + post_to_make, True)
-    add_association = "INSERT INTO categories (site_id, category_id, association_body) VALUES ('%s', '%s', '%s')" % (siteId, currentCategory, post_to_make)
+    add_association = "INSERT INTO domains (site_id, name, category_id, association_body) VALUES ('%s', '%s' ,'%s', '%s')" % (siteId, currentCatalogDomain, currentCategory, post_to_make)
   else:
     log("Actualizando " + post_to_make, True)
-    add_association = "UPDATE categories SET association_body = '%s' WHERE category_id LIKE '%s'" % (post_to_make, currentCategory)
+    add_association = "UPDATE domains SET association_body = '%s' WHERE category_id LIKE '%s'" % (post_to_make, currentCategory)
   cursor.execute(add_association) 
 
 def createAttribute(tagArray, attributeArray, categoryId, catalog_domain, attributeid, Required, Hidden, Allow_variations, Fixed, Variation_attribute, groupId, fixedValues):
@@ -176,8 +182,10 @@ def createAttribute(tagArray, attributeArray, categoryId, catalog_domain, attrib
     attributeArray.append(attribute)
 
 def createFixedValue(fixedArray, value_name, value_id, fixed_categories):
-  value = generateFixedValues(value_id, value_name, fixed_categories)
-  fixedArray.append(value)
+  if(value_id and value_name):
+    value = generateFixedValues(value_id, value_name, fixed_categories)
+    fixedArray.append(value)
+
 
 def main(argv):
   global logFile
@@ -202,7 +210,9 @@ def main(argv):
       conn = MySQLdb.connect(host="localhost",
                   user="root",
                   passwd="megasitio",
-                  db="classimig")
+                  db="classimig",
+                  charset='utf8',
+                  use_unicode=True)
 
     cursor = conn.cursor()
     loadAttributesFromCSV()
