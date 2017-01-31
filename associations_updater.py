@@ -62,7 +62,7 @@ def loadAttributesFromCSV():
 
         categoryId = row['categoryId'].strip()
         catalog_domain = row['catalog_domain'].strip()
-        attributeid = row['attributeid'].strip()
+        attributeid = row['attributeid'].strip().upper()
         Required = row['Required'].strip()
         Hidden = row['Hidden'].strip()
         Allow_variations = row['Allow_variations'].strip()
@@ -70,9 +70,9 @@ def loadAttributesFromCSV():
         Variation_attribute = row['Variation_attribute'].strip()
         groupId = row['groupId'].strip()
 
-        value_name = row['fixedValueName']
-        value_id = row['fixedValueId'].strip()
-        fixed_categories = row['fixedCategs'].strip()
+        value_name = row['fixedValueName'].upper()
+        value_id = row['fixedValueId'].strip().upper()
+        fixed_categories = row['fixedCategs'].strip().upper()
 
         # Si me cambia la categoría que tengía o el catalog domain, entonces genero un POST con la información que tenía
         if currentCategory != categoryId or currentCatalogDomain != catalog_domain: 
