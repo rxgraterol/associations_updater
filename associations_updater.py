@@ -119,8 +119,6 @@ def loadAttributesFromCSV():
     post_to_make = post_to_make.replace("'{", "{")
     post_to_make = post_to_make.replace("}'", "}")
     log("guardando " + post_to_make)
-    print "POST TO MAKE SIZE"
-    print sys.getsizeof(post_to_make)
     dbSave(currentCatalogDomain, currentCategory, post_to_make)
   
   if not error:
@@ -141,7 +139,7 @@ def dbSave(currentCatalogDomain, currentCategory, post_to_make):
   else:
     siteId = 'MLB'
   # Guardo con los otros POSTs
-  category = "SELECT * FROM domains WHERE category_id LIKE '%s'" % currentCategory
+  category = "SELECT * FROM domains WHERE name = '%s' AND category_id = '%s'" % (currentCatalogDomain, currentCategory)
   cursor.execute(category)
 
   if(cursor.rowcount == 0):
@@ -149,7 +147,7 @@ def dbSave(currentCatalogDomain, currentCategory, post_to_make):
     add_association = "INSERT INTO domains (site_id, name, category_id, association_body) VALUES ('%s', '%s' ,'%s', '%s')" % (siteId, currentCatalogDomain, currentCategory, post_to_make)
   else:
     log("Actualizando " + post_to_make, True)
-    add_association = "UPDATE domains SET association_body = '%s' WHERE category_id LIKE '%s'" % (post_to_make, currentCategory)
+    add_association = "UPDATE domains SET association_body = '%s' WHERE name LIKE '%s'" % (post_to_make, currentCatalogDomain)
   cursor.execute(add_association) 
 
 def createAttribute(tagArray, attributeArray, categoryId, catalog_domain, attributeid, Required, Hidden, Allow_variations, Fixed, Variation_attribute, groupId, fixedValues):

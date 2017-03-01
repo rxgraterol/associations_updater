@@ -118,7 +118,9 @@ def main(argv):
          print 'python unit_restrictions.py -f archivo_con_restricciones.csv -e development|production'
          sys.exit()
       if opt in ('-e', '--enviroment'):
-         enviroment = arg
+        print "ENVIROMENT DE SHIT"
+        print arg
+        enviroment = arg
       if opt in ('-f', '--file'):
          file = arg
 
@@ -129,13 +131,12 @@ def main(argv):
 
     logFile = open(filename + ".log", 'wb')
     if enviroment == 'production':
-      conn = MySQLdb.connect()
-      
+      print "MUJERES DURMIENDO EN CALZONES"
     else:
-      conn = MySQLdb.connect(host="localhost",
-                  user="root",
-                  passwd="megasitio",
-                  db="classimig")
+      conn = MySQLdb.connect(host="172.16.125.57", port=6612,
+             user="classimig_WPROD",
+             passwd="yUYaq39yWo",
+             db="classimig")
 
     cursor = conn.cursor()
     loadAttributesFromCSV()
